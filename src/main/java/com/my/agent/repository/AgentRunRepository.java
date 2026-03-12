@@ -13,4 +13,6 @@ public interface AgentRunRepository {
     void updatePlan(String runId, String status, String planJson, String currentStepId);
 
     void updateFinalResult(String runId, String status, String finalResult, String errorMessage);
+
+    void updateCurrentStep(String runId, String currentStepId, String status);
 }

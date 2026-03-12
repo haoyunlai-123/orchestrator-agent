@@ -84,4 +84,14 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
                 """;
         jdbcTemplate.update(sql, status, finalResult, errorMessage, runId);
     }
+
+    @Override
+    public void updateCurrentStep(String runId, String currentStepId, String status) {
+        String sql = """
+            UPDATE agent_run
+            SET current_step_id = ?, status = ?
+            WHERE run_id = ?
+            """;
+        jdbcTemplate.update(sql, currentStepId, status, runId);
+    }
 }

@@ -109,4 +109,53 @@ public class AgentStepRunRepositoryImpl implements AgentStepRunRepository {
         String sql = "SELECT * FROM agent_step_run WHERE run_id = ? ORDER BY step_index ASC";
         return jdbcTemplate.query(sql, rowMapper, runId);
     }
+
+    @Override
+    public void updateStepStatus(String runId, String stepId, String status, String errorMessage) {
+        String sql = """
+            UPDATE agent_step_run
+            SET status = ?, error_message = ?
+            WHERE run_id = ? AND step_id = ?
+            """;
+        jdbcTemplate.update(sql, status, errorMessage, runId, stepId);
+    }
+
+    @Override
+    public void updateStepRunning(String runId, String stepId) {
+        String sql = """
+            UPDATE agent_step_run
+            SET status = ?, started_at = NOW(), error_message = NULL
+            WHERE run_id = ? AND step_id = ?
+            """;
+        jdbcTemplate.update(sql, "RUNNING", runId, stepId);
+    }
+
+    @Override
+    public void updateStepSuccess(String runId, String stepId, String outputJson, Long jobId, Long jobInstanceId) {
+        String sql = """
+            UPDATE agent_step_run
+            SET status = ?, output_json = ?, job_id = ?, job_instance_id = ?, ended_at = NOW()
+            WHERE run_id = ? AND step_id = ?
+            """;
+        jdbcTemplate.update(sql, "SUCCESS", outputJson, jobId, jobInstanceId, runId, stepId);
+    }
+
+    @Override
+    public AgentStepRunEntity findByRunIdAndStepId(String runId, String stepId) {
+        String sql = "SELECT * FROM agent_step_run WHERE run_id = ? AND step_id = ?";
+        return jdbcTemplate.query(sql, rowMapper, runId, stepId)
+                .stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    @Override
+    public void updateStepFailed(String runId, String stepId, String errorMessage) {
+        String sql = """
+            UPDATE agent_step_run
+            SET status = ?, error_message = ?, ended_at = NOW()
+            WHERE run_id = ? AND step_id = ?
+            """;
+        jdbcTemplate.update(sql, "FAILED", errorMessage, runId, stepId);
+    }
 }

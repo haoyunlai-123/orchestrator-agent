@@ -13,6 +13,7 @@ import com.my.agent.domain.vo.AgentStepDetailVO;
 import com.my.agent.planner.AgentPlanner;
 import com.my.agent.repository.AgentRunRepository;
 import com.my.agent.repository.AgentStepRunRepository;
+import com.my.agent.service.AgentDagExecutor;
 import com.my.agent.service.AgentOrchestratorService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,15 +29,17 @@ public class AgentOrchestratorServiceImpl implements AgentOrchestratorService {
     private final AgentStepRunRepository agentStepRunRepository;
     private final AgentPlanner agentPlanner;
     private final ObjectMapper objectMapper;
+    private final AgentDagExecutor agentDagExecutor;
 
     public AgentOrchestratorServiceImpl(AgentRunRepository agentRunRepository,
                                         AgentStepRunRepository agentStepRunRepository,
                                         AgentPlanner agentPlanner,
-                                        ObjectMapper objectMapper) {
+                                        ObjectMapper objectMapper, AgentDagExecutor agentDagExecutor) {
         this.agentRunRepository = agentRunRepository;
         this.agentStepRunRepository = agentStepRunRepository;
         this.agentPlanner = agentPlanner;
         this.objectMapper = objectMapper;
+        this.agentDagExecutor = agentDagExecutor;
     }
 
     @Override
@@ -79,11 +82,6 @@ public class AgentOrchestratorServiceImpl implements AgentOrchestratorService {
                 .collect(Collectors.toList());
 
         agentStepRunRepository.batchInsert(stepEntities);
-    }
-
-    @Override
-    public void execute(String runId) {
-        // 下一步再做：查plan -> 调DAG执行器
     }
 
     @Override
@@ -138,6 +136,33 @@ public class AgentOrchestratorServiceImpl implements AgentOrchestratorService {
             return objectMapper.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("json序列化失败", e);
+        }
+    }
+
+    @Override
+    public void execute(String runId) {
+        AgentRunEntity run = agentRunRepository.findByRunId(runId);
+        if (run == null) {
+            throw new IllegalArgumentException("run不存在: " + runId);
+        }
+
+        if (!AgentRunStatus.PLAN_READY.name().equals(run.getStatus())) {
+            throw new IllegalStateException("当前状态不允许执行: " + run.getStatus());
+        }
+
+        if (run.getPlanJson() == null || run.getPlanJson().isBlank()) {
+            throw new IllegalStateException("plan_json为空，无法执行");
+        }
+
+        AgentPlan plan = fromJson(run.getPlanJson());
+        agentDagExecutor.execute(runId, plan);
+    }
+
+    private AgentPlan fromJson(String json) {
+        try {
+            return objectMapper.readValue(json, AgentPlan.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("plan_json反序列化失败", e);
         }
     }
 }
